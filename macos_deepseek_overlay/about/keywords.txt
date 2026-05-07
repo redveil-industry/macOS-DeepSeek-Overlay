@@ -1,0 +1,3 @@
+macos
+deepseek
+overlay
