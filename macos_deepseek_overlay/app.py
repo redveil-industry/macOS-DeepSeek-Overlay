@@ -1,7 +1,3 @@
-# Python libraries
-import os
-import sys
-
 # Apple libraries
 import objc
 from AppKit import *
@@ -15,10 +11,7 @@ from .constants import (
     APP_TITLE,
     CORNER_RADIUS,
     DRAG_AREA_HEIGHT,
-    LOGO_BLACK_PATH,
-    LOGO_WHITE_PATH,
     FRAME_SAVE_NAME,
-    STATUS_ITEM_CONTEXT,
     WEBSITE,
     LAUNCHER_TRIGGER,
 )
@@ -108,12 +101,18 @@ class AppDelegate(NSObject):
             NSMakeRect(0, content_bounds.size.height - DRAG_AREA_HEIGHT, content_bounds.size.width, DRAG_AREA_HEIGHT)
         )
         content_view.addSubview_(self.drag_area)
-        # Add close button to the drag area
-        close_button = NSButton.alloc().initWithFrame_(NSMakeRect(5, 5, 20, 20))
+        # Add minimize and close buttons to the drag area
+        minimize_button = NSButton.alloc().initWithFrame_(NSMakeRect(5, 5, 20, 20))
+        minimize_button.setBordered_(False)
+        minimize_button.setImage_(NSImage.imageWithSystemSymbolName_accessibilityDescription_("minus.circle.fill", None))
+        minimize_button.setTarget_(self)
+        minimize_button.setAction_("hideWindow:")
+        self.drag_area.addSubview_(minimize_button)
+        close_button = NSButton.alloc().initWithFrame_(NSMakeRect(30, 5, 20, 20))
         close_button.setBordered_(False)
         close_button.setImage_(NSImage.imageWithSystemSymbolName_accessibilityDescription_("xmark.circle.fill", None))
-        close_button.setTarget_(self)
-        close_button.setAction_("hideWindow:")
+        close_button.setTarget_(NSApp)
+        close_button.setAction_("terminate:")
         self.drag_area.addSubview_(close_button)
         # Update the webview sizing and insert it below drag area.
         content_view.addSubview_(self.webview)
@@ -140,21 +139,16 @@ class AppDelegate(NSObject):
         """
         user_script = WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(script, WKUserScriptInjectionTimeAtDocumentEnd, True)
         user_content_controller.addUserScript_(user_script)
-        # Create status bar item with logo
+        # Create status bar item with SF Symbol icon (template image auto-adapts to light/dark)
         self.status_item = NSStatusBar.systemStatusBar().statusItemWithLength_(NSSquareStatusItemLength)
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        logo_white_path = os.path.join(script_dir, LOGO_WHITE_PATH)
-        self.logo_white = NSImage.alloc().initWithContentsOfFile_(logo_white_path)
-        self.logo_white.setSize_(NSSize(18, 18))
-        logo_black_path = os.path.join(script_dir, LOGO_BLACK_PATH)
-        self.logo_black = NSImage.alloc().initWithContentsOfFile_(logo_black_path)
-        self.logo_black.setSize_(NSSize(18, 18))
-        # Set the initial logo image based on the current appearance
-        self.updateStatusItemImage()
-        # Observe system appearance changes
-        self.status_item.button().addObserver_forKeyPath_options_context_(
-            self, "effectiveAppearance", NSKeyValueObservingOptionNew, STATUS_ITEM_CONTEXT
-        )
+        status_button = self.status_item.button()
+        symbol = NSImage.imageWithSystemSymbolName_accessibilityDescription_("bubble.left.fill", APP_TITLE)
+        if symbol is None:
+            print("Failed to load SF Symbol bubble.left.fill", flush=True)
+        else:
+            symbol.setSize_(NSSize(18, 18))
+            symbol.setTemplate_(True)
+            status_button.setImage_(symbol)
         # Create status bar menu
         menu = NSMenu.alloc().init()
         # Create and configure menu items with explicit targets
@@ -349,20 +343,3 @@ class AppDelegate(NSObject):
                 r, g, b = [val / 255.0 for val in rgb_values[:3]]
                 color = NSColor.colorWithCalibratedRed_green_blue_alpha_(r, g, b, 1.0)
                 self.drag_area.setBackgroundColor_(color)
-
-    # Logic for checking what color the logo in the status bar should be.
-    def updateStatusItemImage(self):
-        appearance = self.status_item.button().effectiveAppearance()
-        if appearance.bestMatchFromAppearancesWithNames_([NSAppearanceNameAqua, NSAppearanceNameDarkAqua]) == NSAppearanceNameDarkAqua:
-            self.status_item.button().setImage_(self.logo_white)
-        else:
-            self.status_item.button().setImage_(self.logo_black)
-
-    # Observer triggered when the color of the status bar logo might need updating.
-    def observeValueForKeyPath_ofObject_change_context_(self, keyPath, object, change, context):
-        if context == STATUS_ITEM_CONTEXT and keyPath == "effectiveAppearance":
-            self.updateStatusItemImage()
-
-    # System triggered appearance changes that might affect logo color.
-    def appearanceDidChange_(self, notification):
-        self.updateStatusItemImage()
