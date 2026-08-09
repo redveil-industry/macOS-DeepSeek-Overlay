@@ -53,7 +53,7 @@ if __name__ == "__main__":
                 git_username=git_username, package=package, version=version),
             description = description,
             keywords = keywords,
-            python_requires = '>=3.10',
+            python_requires = '>=3.9',
             license='MIT',
             classifiers=classifiers
         )
@@ -70,7 +70,7 @@ if __name__ == "__main__":
                         'NSMicrophoneUsageDescription': 'Microphone access is needed for voice mode features.',
                         'NSInputMonitoringUsageDescription': 'Needed to listen for your chosen keyboard trigger to show/hide the overlay.',
                     },
-                    'includes': ['objc', 'AppKit', 'WebKit', 'Quartz', 'Foundation', 'ApplicationServices'],
+                    'includes': ['objc', 'AppKit', 'WebKit', 'Quartz', 'Foundation', 'ApplicationServices', 'AVFoundation'],
                     'excludes': ['docutils', 'setuptools', 'pkg_resources', 'importlib_resources'],
                     'packages': [package],
                     'resources': [
