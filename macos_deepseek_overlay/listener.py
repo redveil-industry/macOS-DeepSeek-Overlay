@@ -47,6 +47,17 @@ SPECIAL_KEY_NAMES = {
 }
 handle_new_trigger = None
 
+# A trigger with no modifier would fire on every ordinary keystroke of that
+# key and make normal typing in the webview unusable, so at least one of
+# these must be present for a custom trigger to be accepted.
+REQUIRED_MODIFIER_MASK = (
+    NSEventModifierFlagOption | NSEventModifierFlagCommand | NSEventModifierFlagControl
+)
+
+
+def is_valid_trigger(flags, keycode):
+    return isinstance(keycode, int) and keycode >= 0 and bool(flags & REQUIRED_MODIFIER_MASK)
+
 
 # Update the trigger menu item label.
 def update_menu_trigger_label(app):
@@ -145,9 +156,18 @@ def set_custom_launcher_trigger(app):
     content_view.addSubview_(overlay_view)
     # Define the handler for the new trigger
     def custom_handle_new_trigger(event, flags, keycode):
+        if not is_valid_trigger(flags, keycode):
+            print(f"Rejected trigger (flags={flags}, key={keycode}): needs ⌘/⌥/⌃.", flush=True)
+            trigger_display.setStringValue_("Needs ⌘/⌥/⌃ — try again")
+            return None
         launcher_trigger = {"flags": flags, "key": keycode}
-        with open(TRIGGER_FILE, "w") as f:
-            json.dump(launcher_trigger, f)
+        try:
+            with open(TRIGGER_FILE, "w") as f:
+                json.dump(launcher_trigger, f)
+        except OSError as e:
+            print(f"Failed to save custom trigger: {e}", flush=True)
+            trigger_display.setStringValue_("Failed to save — try again")
+            return None
         LAUNCHER_TRIGGER.update(launcher_trigger)
         try:
             update_menu_trigger_label(app)
@@ -190,11 +210,14 @@ def get_trigger_string(event, flags, keycode):
             key_name = NSEvent.eventWithCGEvent_(event).characters()
         else:
             key_name = {
-                0:"A",1:"S",2:"D",3:"F",4:"H",5:"G",6:"Z",7:"X",8:"C",9:"V",
-                11:"B",12:"Q",13:"W",14:"E",15:"R",16:"Y",17:"T",
-                31:"O",35:"P",32:"U",34:"I",46:"M",45:"N",47:"?",44:",",
-                18:"1",19:"2",20:"3",21:"4",22:"6",23:"5",25:"9",29:"0",
-                27:"7",24:"=",26:"-",28:"8",43:";",41:"'",42:"\\",39:"L",38:"J",37:"K"
+                # number row
+                18:"1",19:"2",20:"3",21:"4",23:"5",22:"6",26:"7",28:"8",25:"9",29:"0",27:"-",24:"=",
+                # qwertyuiop row
+                12:"Q",13:"W",14:"E",15:"R",17:"T",16:"Y",32:"U",34:"I",31:"O",35:"P",33:"[",30:"]",42:"\\",
+                # asdfghjkl row
+                0:"A",1:"S",2:"D",3:"F",5:"G",4:"H",38:"J",40:"K",37:"L",41:";",39:"'",
+                # zxcvbnm row
+                6:"Z",7:"X",8:"C",9:"V",11:"B",45:"N",46:"M",43:",",47:".",44:"/"
             }.get(keycode, str(keycode))
     return " + ".join(modifier_names + [key_name]) if modifier_names else key_name
 

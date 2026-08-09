@@ -26,6 +26,16 @@ from .listener import (
 )
 
 
+# SF Symbols are only guaranteed present on the OS version they shipped
+# with; imageWithSystemSymbolName_accessibilityDescription_ returns None
+# on a miss instead of raising, so every call site must check.
+def _load_symbol(name, description):
+    symbol = NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, description)
+    if symbol is None:
+        print(f"Failed to load SF Symbol {name}", flush=True)
+    return symbol
+
+
 # Custom window (contains entire application).
 class AppWindow(NSWindow):
     # Explicitly allow key window status
@@ -104,13 +114,21 @@ class AppDelegate(NSObject):
         # Add minimize and close buttons to the drag area
         minimize_button = NSButton.alloc().initWithFrame_(NSMakeRect(5, 5, 20, 20))
         minimize_button.setBordered_(False)
-        minimize_button.setImage_(NSImage.imageWithSystemSymbolName_accessibilityDescription_("minus.circle.fill", None))
+        minimize_symbol = _load_symbol("minus.circle.fill", "Minimize")
+        if minimize_symbol is None:
+            minimize_button.setTitle_("–")
+        else:
+            minimize_button.setImage_(minimize_symbol)
         minimize_button.setTarget_(self)
         minimize_button.setAction_("hideWindow:")
         self.drag_area.addSubview_(minimize_button)
         close_button = NSButton.alloc().initWithFrame_(NSMakeRect(30, 5, 20, 20))
         close_button.setBordered_(False)
-        close_button.setImage_(NSImage.imageWithSystemSymbolName_accessibilityDescription_("xmark.circle.fill", None))
+        close_symbol = _load_symbol("xmark.circle.fill", "Close")
+        if close_symbol is None:
+            close_button.setTitle_("×")
+        else:
+            close_button.setImage_(close_symbol)
         close_button.setTarget_(NSApp)
         close_button.setAction_("terminate:")
         self.drag_area.addSubview_(close_button)
@@ -142,9 +160,9 @@ class AppDelegate(NSObject):
         # Create status bar item with SF Symbol icon (template image auto-adapts to light/dark)
         self.status_item = NSStatusBar.systemStatusBar().statusItemWithLength_(NSSquareStatusItemLength)
         status_button = self.status_item.button()
-        symbol = NSImage.imageWithSystemSymbolName_accessibilityDescription_("bubble.left.fill", APP_TITLE)
+        symbol = _load_symbol("bubble.left.fill", APP_TITLE)
         if symbol is None:
-            print("Failed to load SF Symbol bubble.left.fill", flush=True)
+            status_button.setTitle_(APP_TITLE)
         else:
             symbol.setSize_(NSSize(18, 18))
             symbol.setTemplate_(True)
@@ -296,18 +314,19 @@ class AppDelegate(NSObject):
         key = event.charactersIgnoringModifiers()
         # Command (NOT alt)
         if (key_command or key_control) and (not key_alt):
+            responder = self.window.firstResponder()
             # Select all
-            if key == 'a':
-                self.window.firstResponder().selectAll_(None)
+            if key == 'a' and responder is not None:
+                responder.selectAll_(None)
             # Copy
-            elif key == 'c':
-                self.window.firstResponder().copy_(None)
+            elif key == 'c' and responder is not None:
+                responder.copy_(None)
             # Cut
-            elif key == 'x':
-                self.window.firstResponder().cut_(None)
+            elif key == 'x' and responder is not None:
+                responder.cut_(None)
             # Paste
-            elif key == 'v':
-                self.window.firstResponder().paste_(None)
+            elif key == 'v' and responder is not None:
+                responder.paste_(None)
             # Hide
             elif key == 'h':
                 self.hideWindow_(None)
